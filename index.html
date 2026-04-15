@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Battleship</h1>
+
+    <div id="message-bar">Place your ships to begin!</div>
+
+    <!-- Ship Placement Phase -->
+    <div id="placement-phase">
+        <div id="placement-controls">
+            <h2>Place Your Ships</h2>
+            <div id="ship-selector">
+                <div class="ship-option selected" data-ship="carrier" data-size="5">Carrier (5)</div>
+                <div class="ship-option" data-ship="battleship" data-size="4">Battleship (4)</div>
+                <div class="ship-option" data-ship="cruiser" data-size="3">Cruiser (3)</div>
+                <div class="ship-option" data-ship="submarine" data-size="3">Submarine (3)</div>
+                <div class="ship-option" data-ship="destroyer" data-size="2">Destroyer (2)</div>
+            </div>
+            <button id="rotate-btn">Rotate (Horizontal)</button>
+            <button id="random-btn">Random Placement</button>
+            <button id="reset-btn">Reset</button>
+            <button id="start-btn" disabled>Start Game</button>
+        </div>
+        <div class="grid-container">
+            <h3>Your Board</h3>
+            <div id="placement-grid" class="grid"></div>
+        </div>
+    </div>
+
+    <!-- Game Phase -->
+    <div id="game-phase" class="hidden">
+        <div class="boards-container">
+            <div class="grid-container">
+                <h3>Your Board</h3>
+                <div id="player-grid" class="grid"></div>
+            </div>
+            <div class="grid-container">
+                <h3>Enemy Board</h3>
+                <div id="enemy-grid" class="grid clickable-grid"></div>
+            </div>
+        </div>
+        <div id="ship-status">
+            <div class="status-group">
+                <h4>Your Fleet</h4>
+                <div id="player-fleet"></div>
+            </div>
+            <div class="status-group">
+                <h4>Enemy Fleet</h4>
+                <div id="enemy-fleet"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over" class="hidden">
+        <div id="game-over-content">
+            <h2 id="game-over-message"></h2>
+            <button id="play-again-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
