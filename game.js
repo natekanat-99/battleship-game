@@ -111,7 +111,7 @@
         return cells;
     }
 
-    function isValidPlacement(cells, board, existingShips) {
+    function isValidPlacement(cells, board) {
         for (const { r, c } of cells) {
             if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return false;
             if (board[r][c] !== EMPTY) return false;
@@ -168,7 +168,7 @@
         if (placedShips.some(s => s.name === ship.name)) return;
 
         const cells = getShipCells(r, c, ship.size, placementOrientation);
-        if (!isValidPlacement(cells, playerBoard, placedShips)) return;
+        if (!isValidPlacement(cells, playerBoard)) return;
 
         cells.forEach(({ r: cr, c: cc }) => {
             playerBoard[cr][cc] = SHIP;
@@ -190,7 +190,7 @@
         if (placedShips.some(s => s.name === ship.name)) return;
 
         const cells = getShipCells(r, c, ship.size, placementOrientation);
-        const valid = isValidPlacement(cells, playerBoard, placedShips);
+        const valid = isValidPlacement(cells, playerBoard);
 
         cells.forEach(({ r: cr, c: cc }) => {
             if (cr >= 0 && cr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
@@ -206,25 +206,45 @@
         });
     }
 
-    // Random placement helper
+    // Random placement helper — retries entire layout if any ship can't be placed
     function randomPlaceShips(board) {
-        const ships = [];
-        for (const ship of SHIPS) {
-            let placed = false;
-            let attempts = 0;
-            while (!placed && attempts < 1000) {
-                attempts++;
-                const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
-                const r = Math.floor(Math.random() * GRID_SIZE);
-                const c = Math.floor(Math.random() * GRID_SIZE);
-                const cells = getShipCells(r, c, ship.size, orientation);
-                if (isValidPlacement(cells, board, ships)) {
-                    cells.forEach(({ r: cr, c: cc }) => {
-                        board[cr][cc] = SHIP;
-                    });
-                    ships.push({ name: ship.name, size: ship.size, cells: cells, sunk: false });
-                    placed = true;
+        let ships;
+        let success = false;
+        let globalAttempts = 0;
+        while (!success && globalAttempts < 100) {
+            globalAttempts++;
+            // Reset board
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    board[r][c] = EMPTY;
                 }
+            }
+            ships = [];
+            let allPlaced = true;
+            for (const ship of SHIPS) {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 200) {
+                    attempts++;
+                    const orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+                    const r = Math.floor(Math.random() * GRID_SIZE);
+                    const c = Math.floor(Math.random() * GRID_SIZE);
+                    const cells = getShipCells(r, c, ship.size, orientation);
+                    if (isValidPlacement(cells, board)) {
+                        cells.forEach(({ r: cr, c: cc }) => {
+                            board[cr][cc] = SHIP;
+                        });
+                        ships.push({ name: ship.name, size: ship.size, cells: cells, sunk: false });
+                        placed = true;
+                    }
+                }
+                if (!placed) {
+                    allPlaced = false;
+                    break;
+                }
+            }
+            if (allPlaced) {
+                success = true;
             }
         }
         return ships;
@@ -399,12 +419,13 @@
 
         if (attempts >= 200) {
             // Fallback: find any unattacked cell
-            for (let rr = 0; rr < GRID_SIZE; rr++) {
-                for (let cc = 0; cc < GRID_SIZE; cc++) {
+            let found = false;
+            for (let rr = 0; rr < GRID_SIZE && !found; rr++) {
+                for (let cc = 0; cc < GRID_SIZE && !found; cc++) {
                     if (!aiAttacked.has(`${rr},${cc}`)) {
                         r = rr;
                         c = cc;
-                        break;
+                        found = true;
                     }
                 }
             }

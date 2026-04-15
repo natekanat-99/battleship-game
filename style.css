@@ -93,7 +93,7 @@ h1 {
 }
 
 .ship-option.placed::after {
-    content: ' \u2714';
+    content: ' \2714';
 }
 
 button {
@@ -198,7 +198,7 @@ button {
     cursor: crosshair;
 }
 
-.clickable-grid .cell:hover:not(.hit):not(.miss) {
+.clickable-grid .cell:hover:not(.hit):not(.miss):not(.sunk) {
     background: #1a4a6a;
 }
 
@@ -221,7 +221,7 @@ button {
 }
 
 .cell.hit::after {
-    content: '\u2716';
+    content: '\2716';
     color: #fff;
     font-size: 1.2rem;
     font-weight: bold;
@@ -232,7 +232,7 @@ button {
 }
 
 .cell.miss::after {
-    content: '\u2022';
+    content: '\2022';
     color: #90a4ae;
     font-size: 1.8rem;
 }
@@ -242,7 +242,7 @@ button {
 }
 
 .cell.sunk::after {
-    content: '\u2716';
+    content: '\2716';
     color: #ffcdd2;
     font-size: 1.2rem;
     font-weight: bold;
