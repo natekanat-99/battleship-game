@@ -37,6 +37,7 @@
     // AI state
     let aiHitQueue = []; // cells to target next (hunt-and-target)
     let aiAttacked = new Set(); // 'r,c' strings
+    let aiHuntPool = []; // shuffled pool of cells for random hunt
 
     // ----- DOM refs -----
     const messageBar = document.getElementById('message-bar');
@@ -262,6 +263,7 @@
         // Reset AI state
         aiHitQueue = [];
         aiAttacked = new Set();
+        aiHuntPool = buildShuffledPool();
         gameOver = false;
         playerTurn = true;
 
@@ -390,6 +392,22 @@
         return null;
     }
 
+    // Build a shuffled pool of all 100 cells for random AI attacks
+    function buildShuffledPool() {
+        const pool = [];
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                pool.push({ r, c });
+            }
+        }
+        // Fisher-Yates shuffle
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        return pool;
+    }
+
     // ----- AI Logic (Hunt and Target) -----
     function aiTurn() {
         if (gameOver) return;
@@ -409,30 +427,17 @@
             }
         }
 
-        // Hunt mode: random cell
-        let attempts = 0;
-        do {
-            r = Math.floor(Math.random() * GRID_SIZE);
-            c = Math.floor(Math.random() * GRID_SIZE);
-            attempts++;
-        } while (aiAttacked.has(`${r},${c}`) && attempts < 200);
-
-        if (attempts >= 200) {
-            // Fallback: find any unattacked cell
-            let found = false;
-            for (let rr = 0; rr < GRID_SIZE && !found; rr++) {
-                for (let cc = 0; cc < GRID_SIZE && !found; cc++) {
-                    if (!aiAttacked.has(`${rr},${cc}`)) {
-                        r = rr;
-                        c = cc;
-                        found = true;
-                    }
-                }
+        // Hunt mode: pick next cell from the pre-shuffled pool
+        while (aiHuntPool.length > 0) {
+            const pick = aiHuntPool.pop();
+            if (!aiAttacked.has(`${pick.r},${pick.c}`)) {
+                r = pick.r;
+                c = pick.c;
+                aiAttacked.add(`${r},${c}`);
+                processAiAttack(r, c);
+                return;
             }
         }
-
-        aiAttacked.add(`${r},${c}`);
-        processAiAttack(r, c);
     }
 
     function processAiAttack(r, c) {
@@ -452,17 +457,19 @@
             });
 
             const sunkShip = checkSunk(r, c, playerBoard, playerShips);
+            const coord = `${COL_LABELS[c]}${r + 1}`;
             if (sunkShip) {
                 // Remove from hitQueue any cells that are no longer useful
                 // (cells adjacent to the sunk ship that haven't been attacked)
                 pruneHitQueue();
-                setMessage(`The enemy sunk your ${sunkShip.name}!`);
+                setMessage(`Enemy attacked ${coord} — sunk your ${sunkShip.name}!`);
             } else {
-                setMessage('The enemy hit your ship!');
+                setMessage(`Enemy attacked ${coord} — hit!`);
             }
         } else {
             playerBoard[r][c] = MISS;
-            setMessage('The enemy missed!');
+            const coord = `${COL_LABELS[c]}${r + 1}`;
+            setMessage(`Enemy attacked ${coord} — miss!`);
         }
 
         renderPlayerBoard();
@@ -523,6 +530,7 @@
         aiShips = [];
         aiHitQueue = [];
         aiAttacked = new Set();
+        aiHuntPool = [];
         gameOver = false;
         playerTurn = true;
         currentShipIndex = 0;
