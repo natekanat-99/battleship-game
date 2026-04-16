@@ -50,6 +50,26 @@
 
 ---
 
+## Bug 6: AI Hunt Mode Used Sequential Fallback Instead of True Random
+
+**Description:** When the AI was in hunt mode (no active target), it generated random coordinates but fell back to a sequential scan starting from cell (0,0) — row by row, left to right — if 200 random attempts all collided with already-attacked cells. This caused visibly predictable attack patterns, especially in late game.
+
+**Root Cause:** The random-retry approach (`do { random } while (attacked && attempts < 200)`) had a fallback `for` loop that iterated from (0,0) sequentially. As the board filled up, the random retries failed more often, triggering the sequential scan.
+
+**Fix:** Replaced the random-retry + sequential-fallback approach with a **pre-shuffled pool** of all 100 cells (Fisher-Yates shuffle) created at game start. The AI pops from this pool during hunt mode, guaranteeing truly random, uniform cell selection with no sequential patterns.
+
+---
+
+## Bug 7: AI Attack Messages Did Not Show Coordinates
+
+**Description:** When the AI attacked, the message bar displayed generic text like "The enemy hit your ship!" or "The enemy missed!" without indicating which cell was attacked. This made it difficult for the player to verify where the attack landed on their board.
+
+**Root Cause:** The `processAiAttack` function set messages without including the attacked cell's coordinates.
+
+**Fix:** Added coordinate labels to all AI attack messages using the format `"Enemy attacked B5 — hit!"`, `"Enemy attacked G3 — miss!"`, and `"Enemy attacked A1 — sunk your Carrier!"`.
+
+---
+
 ## Testing Summary
 
 After applying all fixes:
@@ -59,6 +79,8 @@ After applying all fixes:
 - Hit, miss, and sunk markers render correctly with proper Unicode symbols
 - Win/loss conditions trigger correctly when all ships on either side are sunk
 - AI hunt-and-target logic works without infinite loops
+- AI attacks are truly random (pre-shuffled pool, no sequential fallback)
+- AI attack messages show coordinates for clear feedback
 - Fleet status updates correctly with strikethrough for sunk ships
 - "Play Again" fully resets all game state
 - No console errors during gameplay
