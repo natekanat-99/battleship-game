@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Title Screen -->
+    <div id="title-screen">
+        <div id="ocean-bg">
+            <div class="wave wave1"></div>
+            <div class="wave wave2"></div>
+            <div class="wave wave3"></div>
+        </div>
+        <div id="title-content">
+            <h1 id="game-title">Battleship</h1>
+            <p id="title-subtitle">Naval Combat Strategy</p>
+            <button id="start-game-btn">Start Game</button>
+        </div>
+    </div>
+
+    <!-- Audio Controls -->
+    <div id="audio-controls" class="hidden">
+        <button id="mute-toggle" title="Toggle Sound">
+            <span id="sound-icon">&#x1F50A;</span>
+        </button>
+        <div id="volume-sliders">
+            <label>Music <input type="range" id="music-volume" min="0" max="100" value="30"></label>
+            <label>SFX <input type="range" id="sfx-volume" min="0" max="100" value="70"></label>
+        </div>
+    </div>
+
+    <div id="game-wrapper" class="hidden">
+        <h1>Battleship</h1>
+
+        <div id="message-bar">Place your ships to begin!</div>
+
+        <!-- Ship Placement Phase -->
+        <div id="placement-phase">
+            <div id="placement-controls">
+                <h2>Place Your Ships</h2>
+                <p id="drag-hint">Drag ships onto the board. Press <kbd>R</kbd> to rotate.</p>
+                <div id="fleet-panel">
+                    <div class="draggable-ship" draggable="true" data-ship="carrier" data-size="5">
+                        <span class="ship-label">Carrier</span>
+                        <div class="ship-cells"><span></span><span></span><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="draggable-ship" draggable="true" data-ship="battleship" data-size="4">
+                        <span class="ship-label">Battleship</span>
+                        <div class="ship-cells"><span></span><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="draggable-ship" draggable="true" data-ship="cruiser" data-size="3">
+                        <span class="ship-label">Cruiser</span>
+                        <div class="ship-cells"><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="draggable-ship" draggable="true" data-ship="submarine" data-size="3">
+                        <span class="ship-label">Submarine</span>
+                        <div class="ship-cells"><span></span><span></span><span></span></div>
+                    </div>
+                    <div class="draggable-ship" draggable="true" data-ship="destroyer" data-size="2">
+                        <span class="ship-label">Destroyer</span>
+                        <div class="ship-cells"><span></span><span></span></div>
+                    </div>
+                </div>
+                <button id="rotate-btn">Rotate (Horizontal)</button>
+                <button id="random-btn">Random Placement</button>
+                <button id="reset-btn">Reset</button>
+                <button id="start-btn" disabled>Start Game</button>
+            </div>
+            <div class="grid-container">
+                <h3>Your Board</h3>
+                <div id="placement-grid" class="grid"></div>
+            </div>
+        </div>
+
+        <!-- Game Phase -->
+        <div id="game-phase" class="hidden">
+            <div class="boards-container">
+                <div class="grid-container">
+                    <h3>Your Board</h3>
+                    <div id="player-grid" class="grid"></div>
+                </div>
+                <div class="grid-container">
+                    <h3>Enemy Board</h3>
+                    <div id="enemy-grid" class="grid clickable-grid fog-of-war"></div>
+                </div>
+            </div>
+            <div id="ship-status">
+                <div class="status-group">
+                    <h4>Your Fleet</h4>
+                    <div id="player-fleet"></div>
+                </div>
+                <div class="status-group">
+                    <h4>Enemy Fleet</h4>
+                    <div id="enemy-fleet"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="game-over" class="hidden">
+        <div id="game-over-content">
+            <h2 id="game-over-message"></h2>
+            <button id="play-again-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script src="audio.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
