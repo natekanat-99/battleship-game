@@ -1,5 +1,5 @@
 // ============================================================
-// Battleship Game — Pure HTML/CSS/JS
+// Battleship Game — Pure HTML/CSS/JS with Visual Polish & Audio
 // ============================================================
 
 (function () {
@@ -24,22 +24,29 @@
     const SUNK = 4;
 
     // ----- State -----
-    let placementOrientation = 'horizontal'; // horizontal | vertical
-    let currentShipIndex = 0; // index into SHIPS for placement
-    let placedShips = []; // [{name, size, cells:[{r,c}], sunk:false}]
+    let placementOrientation = 'horizontal';
+    let currentShipIndex = 0;
+    let placedShips = [];
     let playerBoard = createEmptyBoard();
     let aiBoard = createEmptyBoard();
-    let playerShips = []; // after game starts
+    let playerShips = [];
     let aiShips = [];
     let gameOver = false;
     let playerTurn = true;
 
     // AI state
-    let aiHitQueue = []; // cells to target next (hunt-and-target)
-    let aiAttacked = new Set(); // 'r,c' strings
-    let aiHuntPool = []; // shuffled pool of cells for random hunt
+    let aiHitQueue = [];
+    let aiAttacked = new Set();
+    let aiHuntPool = [];
+
+    // Drag-and-drop state
+    let draggedShipName = null;
 
     // ----- DOM refs -----
+    const titleScreen = document.getElementById('title-screen');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const audioControls = document.getElementById('audio-controls');
+    const gameWrapper = document.getElementById('game-wrapper');
     const messageBar = document.getElementById('message-bar');
     const placementPhase = document.getElementById('placement-phase');
     const gamePhase = document.getElementById('game-phase');
@@ -53,9 +60,15 @@
     const resetBtn = document.getElementById('reset-btn');
     const startBtn = document.getElementById('start-btn');
     const playAgainBtn = document.getElementById('play-again-btn');
-    const shipOptions = document.querySelectorAll('.ship-option');
     const playerFleet = document.getElementById('player-fleet');
     const enemyFleet = document.getElementById('enemy-fleet');
+    const draggableShips = document.querySelectorAll('.draggable-ship');
+
+    // Audio controls
+    const muteToggle = document.getElementById('mute-toggle');
+    const soundIcon = document.getElementById('sound-icon');
+    const musicVolumeSlider = document.getElementById('music-volume');
+    const sfxVolumeSlider = document.getElementById('sfx-volume');
 
     // ----- Helpers -----
     function createEmptyBoard() {
@@ -66,23 +79,18 @@
         messageBar.textContent = msg;
     }
 
-    // Build a grid DOM with headers (A-J columns, 1-10 rows)
     function buildGrid(container) {
         container.innerHTML = '';
-        // Corner
         const corner = document.createElement('div');
         corner.classList.add('header-cell');
         container.appendChild(corner);
-        // Column headers
         for (let c = 0; c < GRID_SIZE; c++) {
             const hdr = document.createElement('div');
             hdr.classList.add('header-cell');
             hdr.textContent = COL_LABELS[c];
             container.appendChild(hdr);
         }
-        // Rows
         for (let r = 0; r < GRID_SIZE; r++) {
-            // Row header
             const rowHdr = document.createElement('div');
             rowHdr.classList.add('header-cell');
             rowHdr.textContent = r + 1;
@@ -122,26 +130,21 @@
 
     function selectShipOption(index) {
         if (index < 0 || index >= SHIPS.length) return;
-        // Check if already placed
         const ship = SHIPS[index];
         const alreadyPlaced = placedShips.some(s => s.name === ship.name);
         if (alreadyPlaced) return;
         currentShipIndex = index;
-        shipOptions.forEach((opt, i) => {
-            opt.classList.toggle('selected', i === index);
-        });
     }
 
     function updatePlacementUI() {
-        // Update ship options
-        shipOptions.forEach((opt, i) => {
-            const ship = SHIPS[i];
-            const placed = placedShips.some(s => s.name === ship.name);
-            opt.classList.toggle('placed', placed);
-            if (placed) {
-                opt.classList.remove('selected');
-            }
+        // Update draggable ship visuals
+        draggableShips.forEach(el => {
+            const shipName = el.dataset.ship;
+            const placed = placedShips.some(s => s.name.toLowerCase() === shipName);
+            el.classList.toggle('placed', placed);
+            el.draggable = !placed;
         });
+
         // Update board visuals
         for (let r = 0; r < GRID_SIZE; r++) {
             for (let c = 0; c < GRID_SIZE; c++) {
@@ -152,12 +155,11 @@
                 }
             }
         }
-        // Enable start if all ships placed
+
         startBtn.disabled = placedShips.length < SHIPS.length;
 
-        // Auto-select next unplaced ship
         if (placedShips.length < SHIPS.length) {
-            const nextIndex = SHIPS.findIndex((s, i) => !placedShips.some(p => p.name === s.name));
+            const nextIndex = SHIPS.findIndex((s) => !placedShips.some(p => p.name === s.name));
             if (nextIndex !== -1) {
                 selectShipOption(nextIndex);
             }
@@ -180,15 +182,56 @@
         if (placedShips.length === SHIPS.length) {
             setMessage('All ships placed! Click "Start Game" to begin.');
         } else {
-            setMessage(`Place your ${SHIPS.find((s, i) => !placedShips.some(p => p.name === s.name)).name}.`);
+            const nextShip = SHIPS.find((s) => !placedShips.some(p => p.name === s.name));
+            setMessage(`Place your ${nextShip.name}.`);
         }
     }
 
+    function placeShipByName(shipName, r, c) {
+        const shipIndex = SHIPS.findIndex(s => s.name.toLowerCase() === shipName);
+        if (shipIndex === -1) return false;
+        const ship = SHIPS[shipIndex];
+        if (placedShips.some(s => s.name === ship.name)) return false;
+
+        const cells = getShipCells(r, c, ship.size, placementOrientation);
+        if (!isValidPlacement(cells, playerBoard)) return false;
+
+        cells.forEach(({ r: cr, c: cc }) => {
+            playerBoard[cr][cc] = SHIP;
+        });
+        placedShips.push({ name: ship.name, size: ship.size, cells: cells, sunk: false });
+        updatePlacementUI();
+
+        if (placedShips.length === SHIPS.length) {
+            setMessage('All ships placed! Click "Start Game" to begin.');
+        } else {
+            const nextShip = SHIPS.find((s) => !placedShips.some(p => p.name === s.name));
+            if (nextShip) setMessage(`Place your ${nextShip.name}.`);
+        }
+        return true;
+    }
+
     function showPlacementPreview(r, c) {
-        // Clear previous preview
         clearPlacementPreview();
         const ship = SHIPS[currentShipIndex];
         if (placedShips.some(s => s.name === ship.name)) return;
+
+        const cells = getShipCells(r, c, ship.size, placementOrientation);
+        const valid = isValidPlacement(cells, playerBoard);
+
+        cells.forEach(({ r: cr, c: cc }) => {
+            if (cr >= 0 && cr < GRID_SIZE && cc >= 0 && cc < GRID_SIZE) {
+                const cell = getCell(placementGrid, cr, cc);
+                cell.classList.add(valid ? 'ship-preview' : 'ship-preview-invalid');
+            }
+        });
+    }
+
+    function showDragPreview(shipName, r, c) {
+        clearPlacementPreview();
+        const shipIndex = SHIPS.findIndex(s => s.name.toLowerCase() === shipName);
+        if (shipIndex === -1) return;
+        const ship = SHIPS[shipIndex];
 
         const cells = getShipCells(r, c, ship.size, placementOrientation);
         const valid = isValidPlacement(cells, playerBoard);
@@ -207,14 +250,12 @@
         });
     }
 
-    // Random placement helper — retries entire layout if any ship can't be placed
     function randomPlaceShips(board) {
         let ships;
         let success = false;
         let globalAttempts = 0;
         while (!success && globalAttempts < 100) {
             globalAttempts++;
-            // Reset board
             for (let r = 0; r < GRID_SIZE; r++) {
                 for (let c = 0; c < GRID_SIZE; c++) {
                     board[r][c] = EMPTY;
@@ -251,37 +292,54 @@
         return ships;
     }
 
+    // ----- Animation Helpers -----
+    function spawnExplosionParticles(cell) {
+        for (let i = 0; i < 8; i++) {
+            const particle = document.createElement('div');
+            particle.classList.add('explosion-particle');
+            const angle = (i / 8) * Math.PI * 2;
+            const dist = 10 + Math.random() * 10;
+            particle.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+            particle.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+            const colors = ['#ff6f00', '#ff3d00', '#ffab00', '#ff8f00'];
+            particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+            cell.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
+        }
+    }
+
+    function spawnSplashRings(cell) {
+        for (let i = 0; i < 3; i++) {
+            const ring = document.createElement('div');
+            ring.classList.add('splash-ring');
+            ring.style.animationDelay = (i * 0.1) + 's';
+            cell.appendChild(ring);
+            setTimeout(() => ring.remove(), 600);
+        }
+    }
+
     // ----- Game Logic -----
     function startGame() {
-        // Copy player ships
         playerShips = placedShips.map(s => ({ ...s, cells: s.cells.map(c => ({ ...c })), sunk: false }));
 
-        // Place AI ships
         aiBoard = createEmptyBoard();
         aiShips = randomPlaceShips(aiBoard);
 
-        // Reset AI state
         aiHitQueue = [];
         aiAttacked = new Set();
         aiHuntPool = buildShuffledPool();
         gameOver = false;
         playerTurn = true;
 
-        // Switch UI
         placementPhase.classList.add('hidden');
         gamePhase.classList.remove('hidden');
 
-        // Build game grids
         buildGrid(playerGrid);
         buildGrid(enemyGrid);
 
-        // Render player ships on player grid
         renderPlayerBoard();
-
-        // Build fleet status
         renderFleetStatus();
 
-        // Attach enemy grid click
         enemyGrid.querySelectorAll('.cell').forEach(cell => {
             cell.addEventListener('click', handlePlayerAttack);
         });
@@ -308,7 +366,6 @@
             for (let c = 0; c < GRID_SIZE; c++) {
                 const cell = getCell(enemyGrid, r, c);
                 cell.className = 'cell';
-                // Only show hits, misses, and sunk — not ship positions
                 const state = aiBoard[r][c];
                 if (state === HIT) cell.classList.add('hit');
                 else if (state === MISS) cell.classList.add('miss');
@@ -342,34 +399,46 @@
         const c = parseInt(e.target.dataset.col);
         if (isNaN(r) || isNaN(c)) return;
 
-        // Prevent duplicate attacks
         if (aiBoard[r][c] === HIT || aiBoard[r][c] === MISS || aiBoard[r][c] === SUNK) return;
 
-        // Process attack
+        // Play cannon fire sound
+        BattleshipAudio.playCannonFire();
+
+        const cell = getCell(enemyGrid, r, c);
+
         if (aiBoard[r][c] === SHIP) {
             aiBoard[r][c] = HIT;
-            // Check if ship sunk
             const sunkShip = checkSunk(r, c, aiBoard, aiShips);
             if (sunkShip) {
                 setMessage(`You sunk the enemy's ${sunkShip.name}!`);
+                // Re-render to show sunk state, then animate
+                renderEnemyBoard();
+                sunkShip.cells.forEach(sc => {
+                    const sunkCell = getCell(enemyGrid, sc.r, sc.c);
+                    spawnExplosionParticles(sunkCell);
+                });
+                BattleshipAudio.playSinking();
             } else {
                 setMessage('Hit!');
+                renderEnemyBoard();
+                spawnExplosionParticles(cell);
+                setTimeout(() => BattleshipAudio.playExplosion(), 50);
             }
         } else {
             aiBoard[r][c] = MISS;
             setMessage('Miss!');
+            renderEnemyBoard();
+            spawnSplashRings(cell);
+            setTimeout(() => BattleshipAudio.playSplash(), 50);
         }
 
-        renderEnemyBoard();
         renderFleetStatus();
 
-        // Check win
         if (aiShips.every(s => s.sunk)) {
             endGame(true);
             return;
         }
 
-        // AI turn
         playerTurn = false;
         setTimeout(aiTurn, 600);
     }
@@ -382,7 +451,6 @@
             const allHit = ship.cells.every(cell => board[cell.r][cell.c] === HIT);
             if (allHit) {
                 ship.sunk = true;
-                // Mark cells as sunk
                 ship.cells.forEach(cell => {
                     board[cell.r][cell.c] = SUNK;
                 });
@@ -392,7 +460,6 @@
         return null;
     }
 
-    // Build a shuffled pool of all 100 cells for random AI attacks
     function buildShuffledPool() {
         const pool = [];
         for (let r = 0; r < GRID_SIZE; r++) {
@@ -400,7 +467,6 @@
                 pool.push({ r, c });
             }
         }
-        // Fisher-Yates shuffle
         for (let i = pool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -414,20 +480,17 @@
 
         let r, c;
 
-        // Target mode: try cells from hit queue
         while (aiHitQueue.length > 0) {
             const target = aiHitQueue.shift();
             r = target.r;
             c = target.c;
             if (!aiAttacked.has(`${r},${c}`) && r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-                // Valid target
                 aiAttacked.add(`${r},${c}`);
                 processAiAttack(r, c);
                 return;
             }
         }
 
-        // Hunt mode: pick next cell from the pre-shuffled pool
         while (aiHuntPool.length > 0) {
             const pick = aiHuntPool.pop();
             if (!aiAttacked.has(`${pick.r},${pick.c}`)) {
@@ -441,9 +504,10 @@
     }
 
     function processAiAttack(r, c) {
+        const cell = getCell(playerGrid, r, c);
+
         if (playerBoard[r][c] === SHIP) {
             playerBoard[r][c] = HIT;
-            // Add adjacent cells to hit queue
             const adj = [
                 { r: r - 1, c: c },
                 { r: r + 1, c: c },
@@ -459,23 +523,31 @@
             const sunkShip = checkSunk(r, c, playerBoard, playerShips);
             const coord = `${COL_LABELS[c]}${r + 1}`;
             if (sunkShip) {
-                // Remove from hitQueue any cells that are no longer useful
-                // (cells adjacent to the sunk ship that haven't been attacked)
                 pruneHitQueue();
                 setMessage(`Enemy attacked ${coord} — sunk your ${sunkShip.name}!`);
+                renderPlayerBoard();
+                sunkShip.cells.forEach(sc => {
+                    const sunkCell = getCell(playerGrid, sc.r, sc.c);
+                    spawnExplosionParticles(sunkCell);
+                });
+                BattleshipAudio.playSinking();
             } else {
                 setMessage(`Enemy attacked ${coord} — hit!`);
+                renderPlayerBoard();
+                spawnExplosionParticles(cell);
+                BattleshipAudio.playExplosion();
             }
         } else {
             playerBoard[r][c] = MISS;
             const coord = `${COL_LABELS[c]}${r + 1}`;
             setMessage(`Enemy attacked ${coord} — miss!`);
+            renderPlayerBoard();
+            spawnSplashRings(cell);
+            BattleshipAudio.playSplash();
         }
 
-        renderPlayerBoard();
         renderFleetStatus();
 
-        // Check loss
         if (playerShips.every(s => s.sunk)) {
             endGame(false);
             return;
@@ -485,8 +557,6 @@
     }
 
     function pruneHitQueue() {
-        // Remove targets that are adjacent only to fully-sunk ships
-        // Keep targets adjacent to unsunk hits
         const unsunkHits = new Set();
         for (let r = 0; r < GRID_SIZE; r++) {
             for (let c = 0; c < GRID_SIZE; c++) {
@@ -501,7 +571,6 @@
             return;
         }
 
-        // Keep only targets adjacent to unsunk hits
         aiHitQueue = aiHitQueue.filter(({ r, c }) => {
             if (aiAttacked.has(`${r},${c}`)) return false;
             const adj = [
@@ -519,7 +588,15 @@
         gameOverMessage.textContent = playerWon
             ? 'Victory! You sunk all enemy ships!'
             : 'Defeat! All your ships have been sunk!';
-        gameOverOverlay.classList.remove('hidden');
+
+        gameOverOverlay.classList.remove('hidden', 'victory', 'defeat');
+        gameOverOverlay.classList.add(playerWon ? 'victory' : 'defeat');
+
+        if (playerWon) {
+            BattleshipAudio.playVictoryFanfare();
+        } else {
+            BattleshipAudio.playDefeatSting();
+        }
     }
 
     function resetAll() {
@@ -535,6 +612,7 @@
         playerTurn = true;
         currentShipIndex = 0;
         placementOrientation = 'horizontal';
+        draggedShipName = null;
 
         placementPhase.classList.remove('hidden');
         gamePhase.classList.add('hidden');
@@ -548,28 +626,111 @@
         setMessage('Place your ships to begin!');
     }
 
-    // ----- Event Handlers -----
+    // ----- Drag-and-Drop Placement -----
+    function setupDragAndDrop() {
+        draggableShips.forEach(shipEl => {
+            shipEl.addEventListener('dragstart', function (e) {
+                if (this.classList.contains('placed')) {
+                    e.preventDefault();
+                    return;
+                }
+                draggedShipName = this.dataset.ship;
+                this.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', this.dataset.ship);
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            shipEl.addEventListener('dragend', function () {
+                this.classList.remove('dragging');
+                clearPlacementPreview();
+                draggedShipName = null;
+            });
+        });
+    }
+
     function attachPlacementListeners() {
-        placementGrid.querySelectorAll('.cell').forEach(cell => {
+        const cells = placementGrid.querySelectorAll('.cell');
+        cells.forEach(cell => {
+            // Click to place (fallback)
             cell.addEventListener('click', function () {
                 const r = parseInt(this.dataset.row);
                 const c = parseInt(this.dataset.col);
                 placeShipOnBoard(r, c);
             });
+
+            // Hover preview
             cell.addEventListener('mouseenter', function () {
                 const r = parseInt(this.dataset.row);
                 const c = parseInt(this.dataset.col);
-                showPlacementPreview(r, c);
+                if (draggedShipName) {
+                    showDragPreview(draggedShipName, r, c);
+                } else {
+                    showPlacementPreview(r, c);
+                }
             });
+
             cell.addEventListener('mouseleave', function () {
                 clearPlacementPreview();
+            });
+
+            // Drag-and-drop events
+            cell.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const r = parseInt(this.dataset.row);
+                const c = parseInt(this.dataset.col);
+                if (draggedShipName) {
+                    showDragPreview(draggedShipName, r, c);
+                }
+            });
+
+            cell.addEventListener('dragleave', function () {
+                clearPlacementPreview();
+            });
+
+            cell.addEventListener('drop', function (e) {
+                e.preventDefault();
+                const shipName = e.dataTransfer.getData('text/plain');
+                const r = parseInt(this.dataset.row);
+                const c = parseInt(this.dataset.col);
+                if (shipName) {
+                    placeShipByName(shipName, r, c);
+                }
+                clearPlacementPreview();
+                draggedShipName = null;
             });
         });
     }
 
+    // ----- Event Handlers -----
+
+    // Title screen -> placement
+    startGameBtn.addEventListener('click', function () {
+        BattleshipAudio.init();
+        BattleshipAudio.startMusic();
+        audioControls.classList.remove('hidden');
+
+        titleScreen.classList.add('fade-out');
+        setTimeout(() => {
+            titleScreen.style.display = 'none';
+            gameWrapper.classList.remove('hidden');
+        }, 800);
+    });
+
+    // Rotation
     rotateBtn.addEventListener('click', function () {
         placementOrientation = placementOrientation === 'horizontal' ? 'vertical' : 'horizontal';
         rotateBtn.textContent = `Rotate (${placementOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'})`;
+    });
+
+    // R key rotation
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'r' || e.key === 'R') {
+            if (!placementPhase.classList.contains('hidden')) {
+                placementOrientation = placementOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+                rotateBtn.textContent = `Rotate (${placementOrientation === 'horizontal' ? 'Horizontal' : 'Vertical'})`;
+            }
+        }
     });
 
     randomBtn.addEventListener('click', function () {
@@ -598,14 +759,24 @@
 
     playAgainBtn.addEventListener('click', resetAll);
 
-    shipOptions.forEach((opt, i) => {
-        opt.addEventListener('click', function () {
-            selectShipOption(i);
-        });
+    // ----- Audio Controls -----
+    muteToggle.addEventListener('click', function () {
+        const wasMuted = BattleshipAudio.isMuted();
+        BattleshipAudio.setMuted(!wasMuted);
+        soundIcon.textContent = wasMuted ? '\u{1F50A}' : '\u{1F507}';
+    });
+
+    musicVolumeSlider.addEventListener('input', function () {
+        BattleshipAudio.setMusicVolume(this.value / 100);
+    });
+
+    sfxVolumeSlider.addEventListener('input', function () {
+        BattleshipAudio.setSfxVolume(this.value / 100);
     });
 
     // ----- Init -----
     buildGrid(placementGrid);
     attachPlacementListeners();
+    setupDragAndDrop();
     selectShipOption(0);
 })();
