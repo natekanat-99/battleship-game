@@ -4,7 +4,7 @@ A browser-based Battleship game built with pure HTML, CSS, and JavaScript. Play 
 
 ## Live Demo
 
-**[Play Battleship](https://natekanat-99.github.io/battleship-game/)**
+**[Play Battleship]([https://natekanat-99.github.io/battleship-game/](https://battleship-game-rjzfzwkq.devinapps.com/))**
 
 ## Features
 
